@@ -1,23 +1,108 @@
+#include "buzzer.h"
 #include "ch.h" // ChibiOS
 #include "hal.h"
 #include "terminal.h"
 #include <stdio.h>
 #include "commands.h"
 
+
+
+
 static THD_WORKING_AREA(buzzer_thread_wa, 256);
 static THD_FUNCTION(buzzer_thread_fn, arg);
-
-static stm32_gpio_t *ADC3_PORT = GPIOC;
-static int ADC3_PIN = 5;
-
-
-// Settings
-#define TIM_CLOCK			1000000 // Hz
-#define TIM_PERIOD          1000
-
+static thread_t *thread = NULL;
 static void buzzer_on(void);
 static void buzzer_off(void);
 static void terminal_set_buzzer_freq(int argc, const char **argv);
+static mailbox_t mailbox;
+static msg_t mailbox_messages[5];
+
+
+
+
+const beep_sequence_t BEEP_SEQUENCE_START_BEEP = 
+{
+	4,
+	{{1000,200},{1200,200},{1300,200},{1500,200}},
+};
+
+
+const beep_sequence_t BEEP_SEQUENCE_LOW_VOLTAGE =
+{
+	4,
+	{
+		{1500,200},{1200,200},{1000,200}, {0,200},
+	},
+};
+beap_guarded_t BEEP_LOW_VOLTAGE = 
+{
+	.last_beep_time = 0,
+	.min_beep_period = S2ST(30), 
+	.sequence = &BEEP_SEQUENCE_LOW_VOLTAGE,
+};
+
+const beep_sequence_t BEEP_SEQUENCE_HIGH_VOLTAGE =
+{
+	4,
+	{
+		{1000,200}, {1200,200}, {1500,200}, {0,200},
+	},
+};
+ beap_guarded_t BEEP_HIGH_VOLTAGE = 
+{
+	.last_beep_time = 0,
+	.min_beep_period = S2ST(30), 
+	.sequence = &BEEP_SEQUENCE_HIGH_VOLTAGE,
+};
+
+const beep_sequence_t BEEP_SEQUENCE_FET_TEMP = 
+{
+	4*3,
+	{
+		{1000,200}, {1500,200},{1000,200}, {0,200},
+		{1000,200}, {1500,200},{1000,200}, {0,200},
+		{1000,200}, {1500,200},{1000,200}, {0,200},
+	},
+};
+beap_guarded_t BEEP_FET_TEMP = 
+{
+	.last_beep_time = 0,
+	.min_beep_period = S2ST(10), 
+	.sequence = &BEEP_SEQUENCE_FET_TEMP,
+};
+
+
+const beep_sequence_t BEEP_SEQUENCE_SWITCH_OFF = 
+{
+	6,
+	{
+		{1000,100},{0, 100},{1000,100},{0, 100},{1000,100},{0, 100}
+	},
+};
+
+beap_guarded_t BEEP_SWITCH_OFF = 
+{
+	.last_beep_time = 0,
+	.min_beep_period = S2ST(1), 
+	.sequence = &BEEP_SEQUENCE_SWITCH_OFF,
+};
+
+const beep_sequence_t BEEP_SEQUENCE_DUTY_CYCLE = 
+{
+	1,
+	{
+		{1000,1000},
+	},
+};
+
+beap_guarded_t BEEP_DUTY_CYCLE = 
+{
+	.last_beep_time = 0,
+	.min_beep_period = S2ST(3), 
+	.sequence = &BEEP_SEQUENCE_DUTY_CYCLE,
+};
+
+
 
 void pwm_setup(float freq)
 {
@@ -28,6 +113,8 @@ void pwm_setup(float freq)
 	//			                                   PAL_STM32_OSPEED_HIGHEST | PAL_STM32_PUDR_FLOATING);
 
 	HW_SERVO_TIM_CLK_EN();
+
+	static const uint32_t TIM_CLOCK = 1000000; // 1Mhz
 
 	TIM_TimeBaseStructure.TIM_Period = (uint32_t)((float)TIM_CLOCK / freq);
 	TIM_TimeBaseStructure.TIM_Prescaler = (uint16_t)((168000000 / 2) / TIM_CLOCK) - 1;
@@ -46,23 +133,23 @@ void pwm_setup(float freq)
 
 	TIM_ARRPreloadConfig(HW_SERVO_TIMER, ENABLE);
 
-	HW_SERVO_TIMER->CCR1 = (uint32_t)TIM_PERIOD/2;
+	HW_SERVO_TIMER->CCR1 = TIM_TimeBaseStructure.TIM_Period/2;
 
 	TIM_Cmd(HW_SERVO_TIMER, ENABLE);
 }
 
 void buzzer_start(void) 
 {
+	chMBObjectInit(&mailbox, mailbox_messages, sizeof(mailbox_messages) / sizeof(mailbox_messages[0]));
+
 	terminal_register_command_callback(
-			"buzzer_freq",
-			"Set frequency of buzzer",
+			"buzzer_play",
+			"Play sound",
 			0,
 			terminal_set_buzzer_freq);
 
-
-	chThdCreateStatic(buzzer_thread_wa, sizeof(buzzer_thread_wa), LOWPRIO, buzzer_thread_fn, NULL);
+	thread = chThdCreateStatic(buzzer_thread_wa, sizeof(buzzer_thread_wa), LOWPRIO, buzzer_thread_fn, NULL);
 }
-
 
 static void terminal_set_buzzer_freq(int argc, const char **argv)
 {
@@ -86,6 +173,20 @@ static void terminal_set_buzzer_freq(int argc, const char **argv)
 }
 
 
+void issue_beep_sequence(const beep_sequence_t * beep)
+{
+	chMBPostI(&mailbox, (msg_t)beep);
+}
+
+void issue_beep_guarded(beap_guarded_t * beep)
+{
+	if (chVTTimeElapsedSinceX(beep->last_beep_time) > beep->min_beep_period)
+	{
+		beep->last_beep_time = chVTGetSystemTime();	
+		chMBPostI(&mailbox, (msg_t)beep->sequence);
+	}
+}
+
 static void buzzer_on(void)
 {
 	palSetPadMode(HW_SERVO_PORT, HW_SERVO_PIN, PAL_MODE_ALTERNATE(HW_SERVO_GPIO_AF) |
@@ -104,16 +205,42 @@ static THD_FUNCTION(buzzer_thread_fn, arg)
     (void)arg;
 
     chRegSetThreadName("buzzer_thread");
-    (void)ADC3_PIN;
-    (void)ADC3_PORT;
-
-    pwm_setup(1500);
 
     for(;;) {
-        buzzer_on();
-        chThdSleepMilliseconds(1000);
-        buzzer_off();
-        chThdSleepMilliseconds(1000);
+
+		msg_t message;
+		if (MSG_OK == chMBFetch(&mailbox, &message, TIME_INFINITE))
+		{
+			beep_sequence_t * current_beep_sequence = (beep_sequence_t *)message;
+			
+			if (current_beep_sequence != NULL)
+			{
+				for(uint32_t pos = 0; pos < current_beep_sequence->num; pos++)
+				{
+					beap_t beap = current_beep_sequence->beeps[pos];
+
+					if (beap.freq == 0)
+					{
+						buzzer_off();
+					}
+					else 
+					{
+						buzzer_off();
+						pwm_setup(beap.freq);
+						buzzer_on();
+					}
+					chThdSleepMilliseconds(beap.duration);
+				}
+				buzzer_off();
+
+				// wait before next beep
+				chThdSleepMilliseconds(500);
+			}
+			else 
+			{
+				buzzer_off();
+			}
+		}
     }
 
 }

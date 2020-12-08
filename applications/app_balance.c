@@ -30,6 +30,7 @@
 #include "utils.h"
 #include "datatypes.h"
 #include "comm_can.h"
+#include "buzzer.h"
 
 
 #include <math.h>
@@ -64,6 +65,11 @@ typedef enum {
 	ON
 } SwitchState;
 
+// Audible alert at 1 Volt above tiltback voltage
+#define HEADSUP_LOWHIGH_VOLTAGE_MARGIN 1
+#define HEADSUP_FET_TEMPERATURE 5
+#define HEADSUP_DUTY_MARGIN 5
+
 // Balance thread
 static THD_FUNCTION(balance_thread, arg);
 static THD_WORKING_AREA(balance_thread_wa, 2048); // 2kb stack for this thread
@@ -96,6 +102,8 @@ static float yaw_proportional, yaw_integral, yaw_derivative, yaw_last_proportion
 static systime_t current_time, last_time, diff_time;
 static systime_t fault_angle_pitch_timer, fault_angle_roll_timer, fault_switch_timer, fault_switch_half_timer, fault_duty_timer;
 static float d_pt1_state, d_pt1_k;
+static float max_temp_fet;
+static float max_temp_motor;
 
 
 void app_balance_configure(balance_config *conf, imu_config *conf2) {
@@ -135,6 +143,8 @@ void reset_vars(void){
 	current_time = 0;
 	last_time = 0;
 	diff_time = 0;
+	max_temp_fet = mc_interface_get_configuration()->l_temp_fet_start;
+	max_temp_motor = mc_interface_get_configuration()->l_temp_motor_start;
 }
 
 float app_balance_get_pid_output(void) {
@@ -275,6 +285,29 @@ void calculate_setpoint_target(void){
 		setpointAdjustmentType = TILTBACK;
 		setpoint_target = 0;
 		state = RUNNING;
+#ifdef HAS_EXT_BUZZER
+		
+
+		if(abs_duty_cycle > (balance_conf.tiltback_duty - HEADSUP_DUTY_MARGIN))
+		{
+			issue_beep_guarded(&BEEP_DUTY_CYCLE);
+		}
+
+		if(GET_INPUT_VOLTAGE() < balance_conf.tiltback_low_voltage + HEADSUP_LOWHIGH_VOLTAGE_MARGIN) {
+			issue_beep_guarded(&BEEP_LOW_VOLTAGE);
+		}
+
+		if(GET_INPUT_VOLTAGE() > balance_conf.tiltback_high_voltage + HEADSUP_LOWHIGH_VOLTAGE_MARGIN) {
+			issue_beep_guarded(&BEEP_HIGH_VOLTAGE);
+		}
+
+		if (mc_interface_temp_fet_filtered() > max_temp_fet - HEADSUP_FET_TEMPERATURE) {
+			issue_beep_guarded(&BEEP_FET_TEMP);
+		}
+		if (mc_interface_temp_motor_filtered() > max_temp_motor - HEADSUP_FET_TEMPERATURE) {
+			issue_beep_guarded(&BEEP_FET_TEMP);
+		}
+#endif
 	}
 }
 
@@ -413,6 +446,20 @@ static THD_FUNCTION(balance_thread, arg) {
 			}
 		}
 
+		/*
+		 * Use external buzzer to notify rider of foot switch faults.
+		 */
+#ifdef HAS_EXT_BUZZER
+		if (switch_state == OFF || switch_state == HALF) {
+			if ((abs_erpm > balance_conf.fault_adc_half_erpm)
+				&& (state >= RUNNING)
+				&& (state <= RUNNING_TILTBACK_CONSTANT))
+			{
+				// If we're at riding speed and the switch is off => ALERT the user
+				issue_beep_guarded(&BEEP_SWITCH_OFF);
+			}
+		}
+#endif
 
 		// Control Loop State Logic
 		switch(state){
@@ -422,7 +469,10 @@ static THD_FUNCTION(balance_thread, arg) {
 					brake();
 					// Wait
 					chThdSleepMilliseconds(50);
-				}
+				}	
+
+				// Let the rider know that the board is ready
+				issue_beep_sequence(&BEEP_SEQUENCE_START_BEEP);
 				reset_vars();
 				state = FAULT_STARTUP; // Trigger a fault so we need to meet start conditions to start
 				break;
