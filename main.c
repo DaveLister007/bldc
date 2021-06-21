@@ -55,6 +55,7 @@
 #endif
 #include "shutdown.h"
 #include "mempools.h"
+#include "buzzer.h"
 
 /*
  * HW resources used:
@@ -250,6 +251,7 @@ int main(void) {
 	comm_can_init();
 #endif
 
+	buzzer_start();
 	app_configuration *appconf = mempools_alloc_appconf();
 	conf_general_read_app_configuration(appconf);
 	app_set_configuration(appconf);

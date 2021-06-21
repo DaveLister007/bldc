@@ -204,7 +204,7 @@
 #endif
 
 // ICU Peripheral for servo decoding
-#define HW_USE_SERVO_TIM4
+/*#define HW_USE_SERVO_TIM4
 #define HW_ICU_TIMER			TIM4
 #define HW_ICU_TIM_CLK_EN()		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE)
 #define HW_ICU_DEV				ICUD4
@@ -212,6 +212,15 @@
 #define HW_ICU_GPIO_AF			GPIO_AF_TIM4
 #define HW_ICU_GPIO				GPIOB
 #define HW_ICU_PIN				6
+
+*/
+
+#define HW_SERVO_PORT			GPIOB
+#define HW_SERVO_PIN			6
+#define HW_SERVO_GPIO_AF		GPIO_AF_TIM4
+#define HW_SERVO_TIMER          TIM4
+#define HW_SERVO_CHANNEL    	ICU_CHANNEL_1
+#define HW_SERVO_TIM_CLK_EN()		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE)
 
 // I2C Peripheral
 #define HW_I2C_DEV				I2CD2

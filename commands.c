@@ -31,7 +31,6 @@
 #include "mc_interface.h"
 #include "app.h"
 #include "timeout.h"
-#include "servo_dec.h"
 #include "comm_can.h"
 #include "flash_helper.h"
 #include "utils.h"

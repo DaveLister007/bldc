@@ -160,6 +160,7 @@ CSRC = $(STARTUPSRC) \
        mempools.c \
        worker.c \
        bms.c \
+       buzzer.c \
        $(HWSRC) \
        $(APPSRC) \
        $(NRFSRC) \
