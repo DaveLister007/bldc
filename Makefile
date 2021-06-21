@@ -135,7 +135,6 @@ CSRC = $(STARTUPSRC) \
        digital_filter.c \
        ledpwm.c \
        mcpwm.c \
-       servo_dec.c \
        utils.c \
        servo_simple.c \
        packet.c \
