@@ -13,7 +13,6 @@ static THD_FUNCTION(buzzer_thread_fn, arg);
 static thread_t *thread = NULL;
 static void buzzer_on(void);
 static void buzzer_off(void);
-static void terminal_set_buzzer_freq(int argc, const char **argv);
 static mailbox_t mailbox;
 static msg_t mailbox_messages[5];
 
@@ -104,19 +103,14 @@ beap_guarded_t BEEP_DUTY_CYCLE =
 
 
 
-void pwm_setup(float freq)
+void pwm_setup(uint32_t freq)
 {
 	TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
 	TIM_OCInitTypeDef  TIM_OCInitStructure;
 
-	//palSetPadMode(HW_SERVO_PORT, HW_SERVO_PIN, PAL_MODE_ALTERNATE(HW_SERVO_GPIO_AF) |
-	//			                                   PAL_STM32_OSPEED_HIGHEST | PAL_STM32_PUDR_FLOATING);
-
-	HW_SERVO_TIM_CLK_EN();
-
 	static const uint32_t TIM_CLOCK = 1000000; // 1Mhz
 
-	TIM_TimeBaseStructure.TIM_Period = (uint32_t)((float)TIM_CLOCK / freq);
+	TIM_TimeBaseStructure.TIM_Period = (uint32_t)(TIM_CLOCK / freq);
 	TIM_TimeBaseStructure.TIM_Prescaler = (uint16_t)((168000000 / 2) / TIM_CLOCK) - 1;
 	TIM_TimeBaseStructure.TIM_ClockDivision = 0;
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
@@ -142,36 +136,10 @@ void buzzer_start(void)
 {
 	chMBObjectInit(&mailbox, mailbox_messages, sizeof(mailbox_messages) / sizeof(mailbox_messages[0]));
 
-	terminal_register_command_callback(
-			"buzzer_play",
-			"Play sound",
-			0,
-			terminal_set_buzzer_freq);
+	HW_SERVO_TIM_CLK_EN();
 
 	thread = chThdCreateStatic(buzzer_thread_wa, sizeof(buzzer_thread_wa), LOWPRIO, buzzer_thread_fn, NULL);
 }
-
-static void terminal_set_buzzer_freq(int argc, const char **argv)
-{
-	if (argc == 2)
-	{
-		float f = 0;
-		if (sscanf(argv[1], "%f", &f) == EOF)
-		{
-			commands_printf("cant parse number: '%s' value.", argv[1]);
-			return;
-		};
-
-		pwm_setup(f);
-
-		commands_printf("done: ");
-	}
-	else
-	{
-		commands_printf("This command requires one argument: freq");
-	}
-}
-
 
 void issue_beep_sequence(const beep_sequence_t * beep)
 {

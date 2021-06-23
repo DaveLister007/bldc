@@ -68,7 +68,7 @@ typedef enum {
 // Audible alert at 1 Volt above tiltback voltage
 #define HEADSUP_LOWHIGH_VOLTAGE_MARGIN 1
 #define HEADSUP_FET_TEMPERATURE 5
-#define HEADSUP_DUTY_MARGIN 5
+#define HEADSUP_DUTY_MARGIN 0.05
 
 // Balance thread
 static THD_FUNCTION(balance_thread, arg);
