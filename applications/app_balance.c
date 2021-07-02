@@ -68,7 +68,7 @@ typedef enum {
 // Audible alert at 1 Volt above tiltback voltage
 #define HEADSUP_LOWHIGH_VOLTAGE_MARGIN 1
 #define HEADSUP_FET_TEMPERATURE 5
-#define HEADSUP_DUTY_MARGIN 0.05
+#define HEADSUP_DUTY_MARGIN 0.0
 
 // Balance thread
 static THD_FUNCTION(balance_thread, arg);
@@ -288,16 +288,16 @@ void calculate_setpoint_target(void){
 #ifdef HAS_EXT_BUZZER
 		
 
-		if(abs_duty_cycle > (balance_conf.tiltback_duty - HEADSUP_DUTY_MARGIN))
+		if(abs_duty_cycle > 0.70)
 		{
 			issue_beep_guarded(&BEEP_DUTY_CYCLE);
 		}
 
-		if(GET_INPUT_VOLTAGE() < balance_conf.tiltback_low_voltage + HEADSUP_LOWHIGH_VOLTAGE_MARGIN) {
+		if(GET_INPUT_VOLTAGE() < (balance_conf.tiltback_low_voltage + HEADSUP_LOWHIGH_VOLTAGE_MARGIN)) {
 			issue_beep_guarded(&BEEP_LOW_VOLTAGE);
 		}
 
-		if(GET_INPUT_VOLTAGE() > balance_conf.tiltback_high_voltage + HEADSUP_LOWHIGH_VOLTAGE_MARGIN) {
+		if(GET_INPUT_VOLTAGE() > (balance_conf.tiltback_high_voltage + HEADSUP_LOWHIGH_VOLTAGE_MARGIN)) {
 			issue_beep_guarded(&BEEP_HIGH_VOLTAGE);
 		}
 
@@ -450,7 +450,7 @@ static THD_FUNCTION(balance_thread, arg) {
 		 * Use external buzzer to notify rider of foot switch faults.
 		 */
 #ifdef HAS_EXT_BUZZER
-		if (switch_state == OFF || switch_state == HALF) {
+		if (switch_state == OFF) {
 			if ((abs_erpm > balance_conf.fault_adc_half_erpm)
 				&& (state >= RUNNING)
 				&& (state <= RUNNING_TILTBACK_CONSTANT))
