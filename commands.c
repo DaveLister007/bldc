@@ -31,7 +31,6 @@
 #include "mc_interface.h"
 #include "app.h"
 #include "timeout.h"
-#include "servo_dec.h"
 #include "comm_can.h"
 #include "flash_helper.h"
 #include "utils.h"
@@ -631,6 +630,7 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		timeout_reset();
 		break;
 
+/*
 	case COMM_GET_DECODED_PPM: {
 		int32_t ind = 0;
 		uint8_t send_buffer[50];
@@ -650,7 +650,7 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		buffer_append_int32(send_buffer, (int32_t)(app_adc_get_voltage2() * 1000000.0), &ind);
 		reply_func(send_buffer, ind);
 	} break;
-
+*/
 	case COMM_GET_DECODED_CHUK: {
 		int32_t ind = 0;
 		uint8_t send_buffer[50];

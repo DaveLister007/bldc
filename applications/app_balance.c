@@ -31,6 +31,7 @@
 #include "datatypes.h"
 #include "comm_can.h"
 #include "terminal.h"
+#include "buzzer.h"
 
 
 #include <math.h>
@@ -69,6 +70,11 @@ typedef struct{
 	float a0, a1, a2, b1, b2;
 	float z1, z2;
 } Biquad;
+
+// Audible alert at 1 Volt above tiltback voltage
+#define HEADSUP_LOWHIGH_VOLTAGE_MARGIN 1
+#define HEADSUP_FET_TEMPERATURE 5
+#define HEADSUP_DUTY_MARGIN 0.0
 
 // Balance thread
 static THD_FUNCTION(balance_thread, arg);
@@ -111,6 +117,8 @@ static float d_pt1_lowpass_state, d_pt1_lowpass_k, d_pt1_highpass_state, d_pt1_h
 static Biquad d_biquad_lowpass, d_biquad_highpass;
 static float motor_timeout;
 static systime_t brake_timeout;
+static float max_temp_fet;
+static float max_temp_motor;
 
 // Debug values
 static int debug_render_1, debug_render_2;
@@ -403,6 +411,29 @@ static void calculate_setpoint_target(void){
 		setpoint_target = 0;
 		state = RUNNING;
 	}
+#ifdef HAS_EXT_BUZZER
+		
+
+		if(abs_duty_cycle > 0.70)
+		{
+			issue_beep_guarded(&BEEP_DUTY_CYCLE);
+		}
+
+		if(GET_INPUT_VOLTAGE() < (balance_conf.tiltback_low_voltage + HEADSUP_LOWHIGH_VOLTAGE_MARGIN)) {
+			issue_beep_guarded(&BEEP_LOW_VOLTAGE);
+		}
+
+		if(GET_INPUT_VOLTAGE() > (balance_conf.tiltback_high_voltage + HEADSUP_LOWHIGH_VOLTAGE_MARGIN)) {
+			issue_beep_guarded(&BEEP_HIGH_VOLTAGE);
+		}
+
+		if (mc_interface_temp_fet_filtered() > max_temp_fet - HEADSUP_FET_TEMPERATURE) {
+			issue_beep_guarded(&BEEP_FET_TEMP);
+		}
+		if (mc_interface_temp_motor_filtered() > max_temp_motor - HEADSUP_FET_TEMPERATURE) {
+			issue_beep_guarded(&BEEP_FET_TEMP);
+		}
+#endif
 }
 
 static void calculate_setpoint_interpolated(void){
@@ -645,6 +676,21 @@ static THD_FUNCTION(balance_thread, arg) {
 			}
 		}
 
+		/*
+		 * Use external buzzer to notify rider of foot switch faults.
+		 */
+#ifdef HAS_EXT_BUZZER
+		if (switch_state == OFF) {
+			if ((abs_erpm > balance_conf.fault_adc_half_erpm)
+				&& (state >= RUNNING)
+				&& (state <= RUNNING_TILTBACK_CONSTANT))
+			{
+				// If we're at riding speed and the switch is off => ALERT the user
+				issue_beep_guarded(&BEEP_SWITCH_OFF);
+			}
+		}
+#endif
+
 
 		// Control Loop State Logic
 		switch(state){
@@ -654,6 +700,8 @@ static THD_FUNCTION(balance_thread, arg) {
 				if(imu_startup_done()){
 					reset_vars();
 					state = FAULT_STARTUP; // Trigger a fault so we need to meet start conditions to start
+					// Let the rider know that the board is ready
+					issue_beep_sequence(&BEEP_SEQUENCE_START_BEEP);
 				}
 				break;
 			case (RUNNING):

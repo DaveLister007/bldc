@@ -161,6 +161,7 @@ CSRC = $(STARTUPSRC) \
        worker.c \
        bms.c \
        events.c \
+       buzzer.c \
        $(HWSRC) \
        $(APPSRC) \
        $(NRFSRC) \
