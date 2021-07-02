@@ -117,8 +117,6 @@ static float d_pt1_lowpass_state, d_pt1_lowpass_k, d_pt1_highpass_state, d_pt1_h
 static Biquad d_biquad_lowpass, d_biquad_highpass;
 static float motor_timeout;
 static systime_t brake_timeout;
-static float max_temp_fet;
-static float max_temp_motor;
 
 // Debug values
 static int debug_render_1, debug_render_2;
@@ -427,10 +425,10 @@ static void calculate_setpoint_target(void){
 			issue_beep_guarded(&BEEP_HIGH_VOLTAGE);
 		}
 
-		if (mc_interface_temp_fet_filtered() > max_temp_fet - HEADSUP_FET_TEMPERATURE) {
+		if (mc_interface_temp_fet_filtered() > 80) {
 			issue_beep_guarded(&BEEP_FET_TEMP);
 		}
-		if (mc_interface_temp_motor_filtered() > max_temp_motor - HEADSUP_FET_TEMPERATURE) {
+		if (mc_interface_temp_motor_filtered() > 80) {
 			issue_beep_guarded(&BEEP_FET_TEMP);
 		}
 #endif
@@ -683,7 +681,7 @@ static THD_FUNCTION(balance_thread, arg) {
 		if (switch_state == OFF) {
 			if ((abs_erpm > balance_conf.fault_adc_half_erpm)
 				&& (state >= RUNNING)
-				&& (state <= RUNNING_TILTBACK_CONSTANT))
+				&& (state <= RUNNING_TILTBACK_LOW_VOLTAGE))
 			{
 				// If we're at riding speed and the switch is off => ALERT the user
 				issue_beep_guarded(&BEEP_SWITCH_OFF);

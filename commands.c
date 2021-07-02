@@ -487,11 +487,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		timeout_reset();
 	} break;
 
-	case COMM_SET_SERVO_POS: {
-		int32_t ind = 0;
-		servo_simple_set_output(buffer_get_float16(data, 1000.0, &ind));
-	} break;
-
 	case COMM_SET_MCCONF: {
 #ifndef	HW_MCCONF_READ_ONLY
 		mc_configuration *mcconf = mempools_alloc_mcconf();
