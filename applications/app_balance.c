@@ -388,6 +388,9 @@ static void calculate_setpoint_target(void){
 		}
 		setpointAdjustmentType = TILTBACK;
 		state = RUNNING_TILTBACK_DUTY;
+
+		issue_beep_guarded(&BEEP_DUTY_CYCLE);
+		
 	}else if(abs_duty_cycle > 0.05 && GET_INPUT_VOLTAGE() > balance_conf.tiltback_high_voltage){
 		if(erpm > 0){
 			setpoint_target = balance_conf.tiltback_angle;
@@ -411,11 +414,6 @@ static void calculate_setpoint_target(void){
 	}
 #ifdef HAS_EXT_BUZZER
 		
-
-		if(abs_duty_cycle > 0.70)
-		{
-			issue_beep_guarded(&BEEP_DUTY_CYCLE);
-		}
 
 		if(GET_INPUT_VOLTAGE() < (balance_conf.tiltback_low_voltage + HEADSUP_LOWHIGH_VOLTAGE_MARGIN)) {
 			issue_beep_guarded(&BEEP_LOW_VOLTAGE);
