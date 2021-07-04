@@ -72,7 +72,7 @@ typedef struct{
 } Biquad;
 
 // Audible alert at 1 Volt above tiltback voltage
-#define HEADSUP_LOWHIGH_VOLTAGE_MARGIN 1
+#define HEADSUP_LOWHIGH_VOLTAGE_MARGIN 0
 #define HEADSUP_FET_TEMPERATURE 5
 #define HEADSUP_DUTY_MARGIN 0.0
 
@@ -413,9 +413,7 @@ static void calculate_setpoint_target(void){
 		state = RUNNING;
 	}
 #ifdef HAS_EXT_BUZZER
-		
-
-		if(GET_INPUT_VOLTAGE() < (balance_conf.tiltback_low_voltage + HEADSUP_LOWHIGH_VOLTAGE_MARGIN)) {
+		if(mc_interface_get_input_voltage_filtered() < (balance_conf.tiltback_low_voltage + HEADSUP_LOWHIGH_VOLTAGE_MARGIN)) {
 			issue_beep_guarded(&BEEP_LOW_VOLTAGE);
 		}
 
@@ -426,7 +424,7 @@ static void calculate_setpoint_target(void){
 		if (mc_interface_temp_fet_filtered() > 80) {
 			issue_beep_guarded(&BEEP_FET_TEMP);
 		}
-		if (mc_interface_temp_motor_filtered() > 80) {
+		if (mc_interface_temp_motor_filtered() > 85) {
 			issue_beep_guarded(&BEEP_FET_TEMP);
 		}
 #endif

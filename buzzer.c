@@ -21,8 +21,8 @@ static msg_t mailbox_messages[5];
 
 const beep_sequence_t BEEP_SEQUENCE_START_BEEP = 
 {
-	4,
-	{{1000,200},{1200,200},{1300,200},{1500,200}},
+	7,
+	{{1000,200},{0,100},{1200,200},{0,100},{1300,200},{0,100},{1500,200}},
 };
 
 
@@ -82,7 +82,7 @@ const beep_sequence_t BEEP_SEQUENCE_SWITCH_OFF =
 beap_guarded_t BEEP_SWITCH_OFF = 
 {
 	.last_beep_time = 0,
-	.min_beep_period = S2ST(1), 
+	.min_beep_period = S2ST(2), 
 	.sequence = &BEEP_SEQUENCE_SWITCH_OFF,
 };
 
